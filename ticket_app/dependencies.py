@@ -5,19 +5,31 @@ from ticket_app.auth_service import AuthService, InvalidToken
 from ticket_app.service import TicketService
 from ticket_app.store import TicketStore
 from ticket_app.user_store import UserStore
-
-store = TicketStore()
-user_store = UserStore()
+from ticket_app.database import SessionLocal
+from sqlalchemy.orm import Session                          # ← NEW
+from ticket_app.pg_user_store import PostgresUserStore  
+    # ← NEW
+from ticket_app.pg_ticket_store import PostgresTicketStore
 
 bearer = HTTPBearer(auto_error=False)
 
 
-def get_service() -> TicketService:
-    return TicketService(store)
 
 
-def get_auth_service() -> AuthService:
-    return AuthService(user_store)
+def get_session():
+    session = SessionLocal()
+    print("session opened")
+    try:
+        yield session
+    finally:
+        session.close()
+        print("session closed")
+
+def get_service(session: Session = Depends(get_session)) -> TicketService:
+    return TicketService(PostgresTicketStore(session))
+
+def get_auth_service(session: Session = Depends(get_session)) -> AuthService:   # ← NEW: needs a session
+    return AuthService(PostgresUserStore(session))                               # ← NEW: the Postgres store
 
 
 def get_current_user(
